@@ -17,11 +17,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/images/01-primary-logo-concept.png" />
       </head>
-      <body className="min-h-screen bg-[#EFEEE3] text-[#20043B] flex flex-col antialiased selection:bg-[#F0D8FF] selection:text-[#20043B]">
+      <body
+        suppressHydrationWarning
+        className="min-h-screen bg-[#EFEEE3] text-[#20043B] flex flex-col antialiased selection:bg-[#F0D8FF] selection:text-[#20043B]"
+      >
         {children}
       </body>
     </html>
