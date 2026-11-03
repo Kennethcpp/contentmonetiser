@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-cream: #EFEEE3;
+    --brand-purple: #20043B;
+    --brand-orange: #FF6C4C;
+    --brand-lavender: #F0D8FF;
+    --brand-lavender-light: #FAF3FF;
+    --brand-orange-light: #FFF0ED;
+    --brand-dark: #120224;
+    --text-primary: #20043B;
+    --text-muted: #6B5B7E;
+    --border-subtle: #E2D9E8;
+  }
+
+  body {
+    background-color: var(--bg-cream);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom background & gradient utilities */
+.bg-cream {
+  background-color: #EFEEE3;
+}
+
+.bg-brand-purple {
+  background-color: #20043B;
+}
+
+.text-brand-purple {
+  color: #20043B;
+}
+
+.bg-brand-orange {
+  background-color: #FF6C4C;
+}
+
+.text-brand-orange {
+  color: #FF6C4C;
+}
+
+.bg-brand-lavender {
+  background-color: #F0D8FF;
+}
+
+.border-brand-purple {
+  border-color: #20043B;
+}
+
+.border-brand-orange {
+  border-color: #FF6C4C;
+}
+
+.border-brand-lavender {
+  border-color: #F0D8FF;
+}
+
+/* Glassmorphism & card shadows */
+.card-shadow {
+  box-shadow: 0 10px 30px -10px rgba(32, 4, 59, 0.08), 0 4px 6px -2px rgba(32, 4, 59, 0.04);
+}
+
+.card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 35px -10px rgba(32, 4, 59, 0.12), 0 6px 10px -2px rgba(32, 4, 59, 0.06);
+}
+
+/* Smooth custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #EFEEE3;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D9C8E5;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #BF9FE0;
+}
