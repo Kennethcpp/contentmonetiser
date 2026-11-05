@@ -30,7 +30,7 @@
 
 - **Framework:** Next.js 16 (App Router) + React 19 + TypeScript
 - **Styling:** Tailwind CSS with custom brand theme tokens
-- **Database:** LibSQL / SQLite (production-ready SQL engine configurable via `DATABASE_URL`)
+- **Database:** MySQL/MariaDB through `mysql2` (XAMPP-compatible)
 - **Authentication:** Zero-dependency HMAC-SHA256 signed session tokens with `bcryptjs` password hashing
 - **Assets:** Official logo concepts, favicon app icons, website banners, promo panels, and dashboard mockups included in `/public/images`
 
@@ -104,6 +104,30 @@ EMAIL_FROM="ContentMonetizer <no-reply@example.com>"
 
 New accounts must verify their email before signing in. Password reset links expire after one hour.
 
+### Local XAMPP database
+
+A standalone MySQL/MariaDB schema is available at [database/contentmonetiser.sql](./database/contentmonetiser.sql).
+
+To load it with XAMPP:
+
+1. Start **MySQL** in the XAMPP Control Panel.
+2. Open `http://localhost/phpmyadmin`.
+3. Use **Import** and select `database/contentmonetiser.sql`.
+4. Import the file without adding seed or demo data.
+
+Configure the application to use that imported database with `.env.local`:
+
+```text
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_DATABASE=contentmonetiser
+MYSQL_USER=root
+MYSQL_PASSWORD=
+MYSQL_CONNECTION_LIMIT=10
+```
+
+The application now uses MySQL/MariaDB directly. `DATABASE_URL`, LibSQL, SQLite files, and the `contentmonetiser.db` file are no longer used.
+
 ### 2. Run development server
 ```bash
 npm run dev
@@ -151,11 +175,12 @@ npm run start
 │   └── lib/
 │       ├── auth.ts           # HMAC session security
 │       ├── categories.ts     # Category list & auto-detection keyword engine
-│       ├── db.ts             # LibSQL SQL schema
+│       ├── db.ts             # MySQL connection pool and schema validation
 │       ├── email.ts          # SMTP verification and reset email delivery
 │       ├── auth-tokens.ts    # Hashed, expiring authentication tokens
 │       └── facebook.ts       # Facebook page follower threshold validator
-└── contentmonetiser.db       # Local SQL file database (auto-generated)
+└── database/
+    └── contentmonetiser.sql  # Standalone MySQL/MariaDB schema
 ```
 
 ---

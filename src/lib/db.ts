@@ -1,153 +1,86 @@
-import { createClient, Client } from "@libsql/client";
-import path from "path";
+import mysql, { Pool, RowDataPacket } from "mysql2/promise";
 
-// Initialize client: local SQLite file by default, or DATABASE_URL if configured
-const dbPath = path.resolve(process.cwd(), "contentmonetiser.db");
-const dbUrl = process.env.DATABASE_URL || `file:${dbPath}`;
+type SqlValue = string | number | boolean | bigint | Date | Buffer | Uint8Array | null;
+type Query = string | { sql: string; args?: SqlValue[] };
 
-let clientInstance: Client | null = null;
-
-export function getDb(): Client {
-  if (!clientInstance) {
-    clientInstance = createClient({
-      url: dbUrl,
-    });
-  }
-  return clientInstance;
+export interface DatabaseResult {
+  rows: RowDataPacket[];
 }
 
-// Initialize tables
+let pool: Pool | null = null;
+
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required database configuration: ${name}`);
+  }
+  return value;
+}
+
+export function getDb(): Database {
+  if (!pool) {
+    pool = mysql.createPool({
+      host: process.env.MYSQL_HOST || "127.0.0.1",
+      port: Number(process.env.MYSQL_PORT || 3306),
+      database: requiredEnv("MYSQL_DATABASE"),
+      user: requiredEnv("MYSQL_USER"),
+      password: process.env.MYSQL_PASSWORD || "",
+      waitForConnections: true,
+      connectionLimit: Number(process.env.MYSQL_CONNECTION_LIMIT || 10),
+      maxIdle: Number(process.env.MYSQL_CONNECTION_LIMIT || 10),
+      idleTimeout: 60000,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 0,
+    });
+  }
+  return new Database(pool);
+}
+
+class Database {
+  constructor(private readonly pool: Pool) {}
+
+  async execute(query: Query): Promise<DatabaseResult> {
+    const sql = typeof query === "string" ? query : query.sql;
+    const args = typeof query === "string" ? [] : query.args || [];
+    const [result] = await this.pool.execute(sql, args);
+    return {
+      rows: Array.isArray(result)
+        ? (result as RowDataPacket[]).map((row) => normalizeRow(row))
+        : [],
+    };
+  }
+}
+
+function normalizeRow(row: RowDataPacket): RowDataPacket {
+  for (const key of ["categories", "placements", "adPlacements"]) {
+    const value = row[key];
+    if (value !== null && typeof value === "object") {
+      row[key] = JSON.stringify(value);
+    }
+  }
+  return row;
+}
+
 let initialized = false;
 
 export async function initDb(): Promise<void> {
   if (initialized) return;
 
   const db = getDb();
+  const result = await db.execute({
+    sql: `SELECT COUNT(*) AS tableCount
+          FROM information_schema.tables
+          WHERE table_schema = ? AND table_name IN
+            ('users', 'auth_tokens', 'ads', 'promotions', 'transactions', 'withdrawals', 'support_tickets')`,
+    args: [requiredEnv("MYSQL_DATABASE")],
+  });
+  const tableCount = Number(result.rows[0]?.tableCount || 0);
 
-  // Users table
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      emailVerified INTEGER DEFAULT 0,
-      phone TEXT,
-      password TEXT NOT NULL,
-      role TEXT NOT NULL,
-      status TEXT NOT NULL,
-      balance REAL DEFAULT 0,
-      facebookPageName TEXT,
-      facebookPageUrl TEXT,
-      facebookFollowers INTEGER DEFAULT 0,
-      categories TEXT,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    )
-  `);
-
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS auth_tokens (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      tokenHash TEXT NOT NULL UNIQUE,
-      type TEXT NOT NULL,
-      expiresAt TEXT NOT NULL,
-      usedAt TEXT,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id)
-    )
-  `);
-
-  // Keep existing local databases compatible with the production schema.
-  const userColumns = await db.execute("PRAGMA table_info(users)");
-  if (!userColumns.rows.some((column) => String(column.name) === "emailVerified")) {
-    await db.execute("ALTER TABLE users ADD COLUMN emailVerified INTEGER DEFAULT 0");
+  if (tableCount !== 7) {
+    throw new Error(
+      "The MySQL schema is incomplete. Import database/contentmonetiser.sql into the configured database."
+    );
   }
-
-  // Ads table
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS ads (
-      id TEXT PRIMARY KEY,
-      advertiserId TEXT NOT NULL,
-      title TEXT NOT NULL,
-      description TEXT NOT NULL,
-      category TEXT NOT NULL,
-      expectedViews INTEGER NOT NULL,
-      cost REAL NOT NULL,
-      placements TEXT NOT NULL,
-      ctaType TEXT NOT NULL,
-      ctaValue TEXT NOT NULL,
-      flyerUrl TEXT,
-      status TEXT NOT NULL,
-      viewsDelivered INTEGER DEFAULT 0,
-      paid INTEGER DEFAULT 1,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      FOREIGN KEY (advertiserId) REFERENCES users(id)
-    )
-  `);
-
-  // Promotions table (Creator promoting an ad)
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS promotions (
-      id TEXT PRIMARY KEY,
-      creatorId TEXT NOT NULL,
-      advertId TEXT NOT NULL,
-      status TEXT NOT NULL,
-      postUrl TEXT,
-      viewsContributed INTEGER DEFAULT 0,
-      earnings REAL DEFAULT 0,
-      startedAt TEXT NOT NULL,
-      completedAt TEXT,
-      FOREIGN KEY (creatorId) REFERENCES users(id),
-      FOREIGN KEY (advertId) REFERENCES ads(id)
-    )
-  `);
-
-  // Transactions table
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS transactions (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      type TEXT NOT NULL,
-      amount REAL NOT NULL,
-      reference TEXT NOT NULL,
-      status TEXT NOT NULL,
-      description TEXT,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id)
-    )
-  `);
-
-  // Withdrawals table
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS withdrawals (
-      id TEXT PRIMARY KEY,
-      creatorId TEXT NOT NULL,
-      amount REAL NOT NULL,
-      bankName TEXT NOT NULL,
-      accountNumber TEXT NOT NULL,
-      accountName TEXT NOT NULL,
-      status TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      processedAt TEXT,
-      FOREIGN KEY (creatorId) REFERENCES users(id)
-    )
-  `);
-
-  // Support tickets table
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS support_tickets (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      subject TEXT NOT NULL,
-      message TEXT NOT NULL,
-      status TEXT NOT NULL,
-      reply TEXT,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id)
-    )
-  `);
 
   initialized = true;
 }
