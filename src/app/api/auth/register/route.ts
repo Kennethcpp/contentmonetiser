@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getDb, initDb } from "@/lib/db";
-import { createSessionToken } from "@/lib/auth";
 import { verifyFacebookPage } from "@/lib/facebook";
+import { issueAuthToken } from "@/lib/auth-tokens";
+import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,7 +39,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    if (role !== "ADVERTISER" && role !== "CREATOR") {
+      return NextResponse.json({ error: "Invalid account type." }, { status: 400 });
+    }
+
+    if (String(password).length < 8) {
+      return NextResponse.json(
+        { error: "Password must be at least 8 characters long." },
+        { status: 400 }
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
     const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
 
@@ -94,37 +106,23 @@ export async function POST(req: NextRequest) {
       ],
     });
 
-    const userObj = {
-      id: userId,
-      name,
-      email: email.toLowerCase().trim(),
-      role: role as "ADVERTISER" | "CREATOR" | "ADMIN",
-      status: userStatus,
-      balance: 0,
-      facebookPageName: fbPageName,
-      facebookPageUrl: fbPageUrl,
-      facebookFollowers: fbFollowers,
-    };
+    try {
+      const verificationToken = await issueAuthToken(
+        userId,
+        "EMAIL_VERIFICATION",
+        24 * 60 * 60 * 1000
+      );
+      await sendVerificationEmail(email.toLowerCase().trim(), name, verificationToken);
+    } catch (emailError) {
+      await db.execute({ sql: "DELETE FROM auth_tokens WHERE userId = ?", args: [userId] });
+      await db.execute({ sql: "DELETE FROM users WHERE id = ?", args: [userId] });
+      throw emailError;
+    }
 
-    const token = await createSessionToken(userObj);
-
-    const response = NextResponse.json({
+    return NextResponse.json({
       success: true,
-      user: userObj,
-      message:
-        role === "CREATOR"
-          ? "Application submitted! Your account is waiting approval (typically takes few minutes to 24 hours)."
-          : "Account created successfully!",
-    });
-
-    response.cookies.set("cm_session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
-
-    return response;
+      message: "Account created. Check your email to verify your address before signing in.",
+    }, { status: 201 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Registration failed";
     return NextResponse.json({ error: message }, { status: 500 });

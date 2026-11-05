@@ -38,6 +38,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!Number(row.emailVerified)) {
+      return NextResponse.json(
+        { error: "Please verify your email address before signing in." },
+        { status: 403 }
+      );
+    }
+
     const userObj = {
       id: String(row.id),
       name: String(row.name),
@@ -60,6 +67,7 @@ export async function POST(req: NextRequest) {
     response.cookies.set("cm_session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });

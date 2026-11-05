@@ -2,7 +2,16 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 import { getDb, initDb } from "./db";
 
-const SECRET = process.env.JWT_SECRET || "cm_super_secure_secret_key_2026_salt";
+const SECRET =
+  process.env.JWT_SECRET ||
+  (process.env.NODE_ENV === "production" ? "" : "cm_local_development_secret");
+
+function getSecret(): string {
+  if (!SECRET) {
+    throw new Error("JWT_SECRET must be configured in production.");
+  }
+  return SECRET;
+}
 
 export interface SessionUser {
   id: string;
@@ -29,7 +38,7 @@ export async function createSessionToken(user: SessionUser): Promise<string> {
 
   const encodedPayload = Buffer.from(payload).toString("base64url");
   const signature = crypto
-    .createHmac("sha256", SECRET)
+    .createHmac("sha256", getSecret())
     .update(encodedPayload)
     .digest("base64url");
 
@@ -43,11 +52,18 @@ export async function verifySessionToken(token: string): Promise<SessionUser | n
 
     const [encodedPayload, signature] = parts;
     const expectedSig = crypto
-      .createHmac("sha256", SECRET)
+      .createHmac("sha256", getSecret())
       .update(encodedPayload)
       .digest("base64url");
 
-    if (signature !== expectedSig) return null;
+    const signatureBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expectedSig);
+    if (
+      signatureBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
+    ) {
+      return null;
+    }
 
     const json = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf-8"));
     if (json.exp && json.exp < Date.now()) return null;

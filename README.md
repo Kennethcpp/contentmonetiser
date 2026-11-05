@@ -81,27 +81,28 @@
 
 ---
 
-## ⚡ Instant 1-Click Demo Accounts
-
-To test all portals immediately, use the **Demo Persona** dropdown in the navigation bar or on `/login`:
-
-| Persona | Role | Email | Highlights |
-| :--- | :--- | :--- | :--- |
-| **TechBrand NG** | `ADVERTISER` | `advertiser@techbrand.ng` | ₦25,000 balance, live campaigns |
-| **Lagos Buzz TV** | `CREATOR` | `creator@lagosbuzz.tv` | Approved creator, 34.5k FB followers |
-| **AfroStyle Daily**| `CREATOR` | `amina@afrostyledaily.com`| Waiting approval application (12.2k followers) |
-| **Platform Ops** | `ADMIN` | `admin@contentmonetiser.io` | Full moderator console |
-
-*Default password for all seeded accounts:* `Admin123!`
-
----
-
 ## 🛠️ Local Development & Setup
 
 ### 1. Install dependencies
 ```bash
 npm install
 ```
+
+### Email configuration
+
+Registration and password recovery require SMTP configuration:
+
+```text
+APP_URL=http://localhost:3000
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=...
+SMTP_PASSWORD=...
+EMAIL_FROM="ContentMonetizer <no-reply@example.com>"
+```
+
+New accounts must verify their email before signing in. Password reset links expire after one hour.
 
 ### 2. Run development server
 ```bash
@@ -127,8 +128,11 @@ npm run start
 │   │   ├── admin/            # Administrator management portal
 │   │   ├── advertiser/       # Advertiser dashboard & ad placement wizard
 │   │   ├── creator/          # Creator dashboard & single-ad promotion tracker
-│   │   ├── login/            # Authentication with instant demo switcher
-│   │   ├── register/         # Dual registration + Facebook verification
+│   │   ├── login/            # Email/password authentication
+│   │   ├── register/         # Registration + email verification
+│   │   ├── forgot-password/  # Password reset request
+│   │   ├── reset-password/   # Password reset completion
+│   │   ├── verify-email/     # Email verification
 │   │   ├── api/
 │   │   │   ├── admin/        # Admin approval & overview endpoints
 │   │   │   ├── ads/          # Ad creation, listing & status actions
@@ -140,14 +144,16 @@ npm run start
 │   │   ├── layout.tsx        # Root layout with fonts & metadata
 │   │   └── page.tsx          # Public marketing landing page
 │   ├── components/
-│   │   ├── Navbar.tsx        # Responsive navigation with demo persona switcher
+│   │   ├── Navbar.tsx        # Responsive navigation
 │   │   ├── Footer.tsx        # Brand footer with "Create. Promote. Earn."
 │   │   ├── PricingCalculator.tsx # Dynamic ₦5/1k views ROI calculator
 │   │   └── icons/            # Brand SVG icons
 │   └── lib/
 │       ├── auth.ts           # HMAC session security
 │       ├── categories.ts     # Category list & auto-detection keyword engine
-│       ├── db.ts             # LibSQL SQL schema & seed loader
+│       ├── db.ts             # LibSQL SQL schema
+│       ├── email.ts          # SMTP verification and reset email delivery
+│       ├── auth-tokens.ts    # Hashed, expiring authentication tokens
 │       └── facebook.ts       # Facebook page follower threshold validator
 └── contentmonetiser.db       # Local SQL file database (auto-generated)
 ```

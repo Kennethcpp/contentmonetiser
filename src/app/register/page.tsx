@@ -58,6 +58,7 @@ function RegisterContent() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submittedWaiting, setSubmittedWaiting] = useState(false);
+  const [registrationMessage, setRegistrationMessage] = useState("");
 
   useEffect(() => {
     const qRole = searchParams.get("role");
@@ -147,12 +148,8 @@ function RegisterContent() {
         throw new Error(data.error || "Registration failed");
       }
 
-      if (role === "CREATOR") {
-        setSubmittedWaiting(true);
-      } else {
-        router.push("/advertiser");
-        router.refresh();
-      }
+      setRegistrationMessage(data.message);
+      setSubmittedWaiting(true);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -193,27 +190,27 @@ function RegisterContent() {
 
             <div>
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                Application Submitted & Email Verified
+                Account Created
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-[#20043B] mt-3">
-                Account Waiting Approval
+                Check Your Email
               </h2>
               <p className="text-sm text-[#6B5B7E] max-w-md mx-auto mt-2 leading-relaxed">
-                Thank you, <strong>{name}</strong>! Your application for <strong>{fbReport?.pageName}</strong> ({fbReport?.followerCount.toLocaleString()} followers) has been received.
+                Thank you, <strong>{name}</strong>! {registrationMessage}
               </p>
               <div className="mt-4 p-4 rounded-2xl bg-[#FAF3FF] border border-[#F0D8FF] text-xs text-[#20043B] max-w-md mx-auto">
                 <p className="font-semibold">
-                  Approval typically takes a few minutes to 24 hours. Once our operations team confirms your page details, you will have immediate full access to all approved adverts to start promoting and earning!
+                  Open the verification link in your email. After verification, you can sign in. Creator applications still require operations approval before promotion access is enabled.
                 </p>
               </div>
             </div>
 
             <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
               <button
-                onClick={() => router.push("/creator")}
+                onClick={() => router.push("/login")}
                 className="px-6 py-3 rounded-2xl bg-[#20043B] text-white text-xs font-bold hover:bg-[#32085c] transition-all"
               >
-                Go to Creator Dashboard (Pending View)
+                Go to Sign In
               </button>
               <Link
                 href="/"

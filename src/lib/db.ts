@@ -1,6 +1,5 @@
 import { createClient, Client } from "@libsql/client";
 import path from "path";
-import fs from "fs";
 
 // Initialize client: local SQLite file by default, or DATABASE_URL if configured
 const dbPath = path.resolve(process.cwd(), "contentmonetiser.db");
@@ -17,7 +16,7 @@ export function getDb(): Client {
   return clientInstance;
 }
 
-// Initialize tables and default seed data
+// Initialize tables
 let initialized = false;
 
 export async function initDb(): Promise<void> {
@@ -31,6 +30,7 @@ export async function initDb(): Promise<void> {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
+      emailVerified INTEGER DEFAULT 0,
       phone TEXT,
       password TEXT NOT NULL,
       role TEXT NOT NULL,
@@ -44,6 +44,25 @@ export async function initDb(): Promise<void> {
       updatedAt TEXT NOT NULL
     )
   `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS auth_tokens (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      tokenHash TEXT NOT NULL UNIQUE,
+      type TEXT NOT NULL,
+      expiresAt TEXT NOT NULL,
+      usedAt TEXT,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id)
+    )
+  `);
+
+  // Keep existing local databases compatible with the production schema.
+  const userColumns = await db.execute("PRAGMA table_info(users)");
+  if (!userColumns.rows.some((column) => String(column.name) === "emailVerified")) {
+    await db.execute("ALTER TABLE users ADD COLUMN emailVerified INTEGER DEFAULT 0");
+  }
 
   // Ads table
   await db.execute(`
@@ -129,161 +148,6 @@ export async function initDb(): Promise<void> {
       FOREIGN KEY (userId) REFERENCES users(id)
     )
   `);
-
-  // Seed default admin and sample users if not present
-  const adminCheck = await db.execute({
-    sql: "SELECT id FROM users WHERE email = ?",
-    args: ["admin@contentmonetiser.io"],
-  });
-
-  if (adminCheck.rows.length === 0) {
-    const now = new Date().toISOString();
-    // Default admin
-    await db.execute({
-      sql: `INSERT INTO users (id, name, email, phone, password, role, status, balance, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        "usr_admin_1",
-        "ContentMonetizer Admin",
-        "admin@contentmonetiser.io",
-        "+2348012345678",
-        "$2a$10$wT3R2uO3EhyuXWw3M6Pmeexs9i3.Kj.eR4d7gJ2gX5vV8nE0yP16.", // "Admin123!"
-        "ADMIN",
-        "APPROVED",
-        0,
-        now,
-        now,
-      ],
-    });
-
-    // Sample Advertiser
-    await db.execute({
-      sql: `INSERT INTO users (id, name, email, phone, password, role, status, balance, categories, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        "usr_adv_1",
-        "Tunde Adeyemi (TechZone NG)",
-        "advertiser@techbrand.ng",
-        "+2348098765432",
-        "$2a$10$wT3R2uO3EhyuXWw3M6Pmeexs9i3.Kj.eR4d7gJ2gX5vV8nE0yP16.",
-        "ADVERTISER",
-        "APPROVED",
-        25000,
-        JSON.stringify(["Tech & Gadgets", "E-commerce & Retail"]),
-        now,
-        now,
-      ],
-    });
-
-    // Sample Approved Creator
-    await db.execute({
-      sql: `INSERT INTO users (id, name, email, phone, password, role, status, balance, facebookPageName, facebookPageUrl, facebookFollowers, categories, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        "usr_creator_1",
-        "Chinedu Okafor",
-        "creator@lagosbuzz.tv",
-        "+2348123456789",
-        "$2a$10$wT3R2uO3EhyuXWw3M6Pmeexs9i3.Kj.eR4d7gJ2gX5vV8nE0yP16.",
-        "CREATOR",
-        "APPROVED",
-        18500,
-        "Lagos Buzz TV",
-        "https://facebook.com/lagosbuzztv",
-        34500,
-        JSON.stringify(["Entertainment", "Tech & Gadgets", "Comedy & Skits"]),
-        now,
-        now,
-      ],
-    });
-
-    // Sample Pending Creator
-    await db.execute({
-      sql: `INSERT INTO users (id, name, email, phone, password, role, status, balance, facebookPageName, facebookPageUrl, facebookFollowers, categories, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        "usr_creator_2",
-        "Amina Bello",
-        "amina@afrostyledaily.com",
-        "+2348145556677",
-        "$2a$10$wT3R2uO3EhyuXWw3M6Pmeexs9i3.Kj.eR4d7gJ2gX5vV8nE0yP16.",
-        "CREATOR",
-        "WAITING_APPROVAL",
-        0,
-        "AfroStyle Daily",
-        "https://facebook.com/afrostyledaily",
-        12200,
-        JSON.stringify(["Fashion & Beauty", "Lifestyle"]),
-        now,
-        now,
-      ],
-    });
-
-    // Seed Sample Ads
-    // 1. Approved Active Ad (Visible to creators!)
-    await db.execute({
-      sql: `INSERT INTO ads (id, advertiserId, title, description, category, expectedViews, cost, placements, ctaType, ctaValue, flyerUrl, status, viewsDelivered, paid, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        "ad_sample_1",
-        "usr_adv_1",
-        "Wireless Earbuds Pro - 40% Black Friday Discount",
-        "Promote our ultra noise-cancelling earbuds. Show the product or announce the special 40% discount with free nationwide delivery in Nigeria. Mention the link in caption or pin comment.",
-        "Tech & Gadgets",
-        100000,
-        500.0, // 100,000 / 1000 * 5 = 500 Naira
-        JSON.stringify(["STARTING", "MIDDLE"]),
-        "WEBSITE",
-        "https://techzoneng.com/earbuds-promo",
-        "/images/07-marketing-promo-banner.png",
-        "APPROVED",
-        32400,
-        1,
-        now,
-        now,
-      ],
-    });
-
-    // 2. Pending Approval Ad (Visible in Admin for approval)
-    await db.execute({
-      sql: `INSERT INTO ads (id, advertiserId, title, description, category, expectedViews, cost, placements, ctaType, ctaValue, flyerUrl, status, viewsDelivered, paid, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        "ad_sample_2",
-        "usr_adv_1",
-        "FastTrack Learn Web Development - Bootcamp Intake",
-        "3-month hands-on coding bootcamp. Beginners welcome. Job placement assistance. Creator should mention starting date and WhatsApp admission line.",
-        "Education & Career",
-        50000,
-        250.0,
-        JSON.stringify(["MIDDLE", "ENDING"]),
-        "PHONE",
-        "+2348099887766",
-        "/images/04-advertiser-creator-promo-panel.png",
-        "PENDING_APPROVAL",
-        0,
-        1,
-        now,
-        now,
-      ],
-    });
-
-    // Seed Sample Deposit Transaction
-    await db.execute({
-      sql: `INSERT INTO transactions (id, userId, type, amount, reference, status, description, createdAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        "txn_sample_1",
-        "usr_adv_1",
-        "DEPOSIT",
-        30000,
-        "DEP-TECHZONE-9812",
-        "COMPLETED",
-        "Wallet top-up via Paystack",
-        now,
-      ],
-    });
-  }
 
   initialized = true;
 }

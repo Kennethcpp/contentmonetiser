@@ -5,14 +5,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  Sparkles,
-  User as UserIcon,
   LogOut,
-  ChevronDown,
   LayoutDashboard,
   Menu,
   X,
-  ShieldAlert,
 } from "lucide-react";
 
 interface User {
@@ -28,7 +24,6 @@ export default function Navbar() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [demoMenuOpen, setDemoMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,31 +43,6 @@ export default function Navbar() {
     setUser(null);
     router.push("/");
     router.refresh();
-  };
-
-  const handleDemoSwitch = async (role: string) => {
-    try {
-      const res = await fetch("/api/auth/demo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
-      });
-      const data = await res.json();
-      if (data.user) {
-        setUser(data.user);
-        setDemoMenuOpen(false);
-        if (data.user.role === "ADVERTISER") {
-          router.push("/advertiser");
-        } else if (data.user.role === "CREATOR") {
-          router.push("/creator");
-        } else if (data.user.role === "ADMIN") {
-          router.push("/admin");
-        }
-        router.refresh();
-      }
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   const getDashboardLink = () => {
@@ -126,57 +96,8 @@ export default function Navbar() {
           </Link>
         </nav>
 
-        {/* Actions & Role Switcher */}
+        {/* Actions */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Demo Role Switcher Pill */}
-          <div className="relative">
-            <button
-              onClick={() => setDemoMenuOpen(!demoMenuOpen)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#F0D8FF] text-[#20043B] hover:bg-[#e4c4fc] transition-colors border border-[#20043B]/15"
-              title="Switch demo test accounts"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-[#FF6C4C]" />
-              <span>Demo Persona</span>
-              <ChevronDown className="w-3 h-3 text-[#20043B]/60" />
-            </button>
-
-            {demoMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white shadow-xl border border-[#20043B]/10 p-2 z-50">
-                <p className="text-[10px] uppercase font-bold tracking-wider text-[#6B5B7E] px-3 py-1.5">
-                  1-Click Test Switch
-                </p>
-                <button
-                  onClick={() => handleDemoSwitch("ADVERTISER")}
-                  className="w-full text-left px-3 py-2 text-xs font-medium rounded-xl hover:bg-[#FFF0ED] hover:text-[#FF6C4C] transition-colors flex items-center justify-between"
-                >
-                  <span>Advertiser (TechBrand)</span>
-                  <span className="text-[10px] bg-[#FF6C4C]/10 text-[#FF6C4C] px-1.5 py-0.5 rounded-md font-bold">₦25k</span>
-                </button>
-                <button
-                  onClick={() => handleDemoSwitch("CREATOR")}
-                  className="w-full text-left px-3 py-2 text-xs font-medium rounded-xl hover:bg-[#FAF3FF] hover:text-[#20043B] transition-colors flex items-center justify-between"
-                >
-                  <span>Creator (Lagos Buzz TV)</span>
-                  <span className="text-[10px] bg-[#F0D8FF] text-[#20043B] px-1.5 py-0.5 rounded-md font-bold">34.5k</span>
-                </button>
-                <button
-                  onClick={() => handleDemoSwitch("CREATOR_PENDING")}
-                  className="w-full text-left px-3 py-2 text-xs font-medium rounded-xl hover:bg-amber-50 hover:text-amber-800 transition-colors flex items-center justify-between"
-                >
-                  <span>Creator (Pending Review)</span>
-                  <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-md font-bold">12k</span>
-                </button>
-                <button
-                  onClick={() => handleDemoSwitch("ADMIN")}
-                  className="w-full text-left px-3 py-2 text-xs font-medium rounded-xl hover:bg-[#20043B]/5 transition-colors flex items-center justify-between"
-                >
-                  <span className="font-semibold text-[#20043B]">Admin Console</span>
-                  <ShieldAlert className="w-3.5 h-3.5 text-[#20043B]" />
-                </button>
-              </div>
-            )}
-          </div>
-
           {!loading && user ? (
             <div className="flex items-center gap-3">
               <Link
@@ -315,38 +236,6 @@ export default function Navbar() {
               </>
             )}
 
-            <div className="pt-3 border-t border-gray-100">
-              <p className="text-[11px] font-bold text-[#6B5B7E] mb-2">Demo Role Switch:</p>
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    handleDemoSwitch("ADVERTISER");
-                  }}
-                  className="py-1.5 px-2 bg-[#FFF0ED] text-[#FF6C4C] font-semibold rounded-lg text-center"
-                >
-                  Advertiser
-                </button>
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    handleDemoSwitch("CREATOR");
-                  }}
-                  className="py-1.5 px-2 bg-[#F0D8FF] text-[#20043B] font-semibold rounded-lg text-center"
-                >
-                  Creator
-                </button>
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    handleDemoSwitch("ADMIN");
-                  }}
-                  className="py-1.5 px-2 bg-gray-100 text-gray-800 font-semibold rounded-lg text-center"
-                >
-                  Admin
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
